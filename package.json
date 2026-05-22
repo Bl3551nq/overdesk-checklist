@@ -1,6 +1,6 @@
 {
   "name": "overdesk-checklist",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Overdesk Checklist — floating productivity widget",
   "main": "main.js",
   "author": {
@@ -8,18 +8,17 @@
     "email": "overdesk.app@gmail.com"
   },
   "scripts": {
-    "start":        "electron .",
-    "icons":        "node scripts/generate-icons.js",
-    "build":        "npm run icons && electron-builder",
-    "build:mac":    "npm run icons && electron-builder --mac",
-    "build:win":    "npm run icons && electron-builder --win",
-    "build:all":    "npm run icons && electron-builder --mac --win"
+    "start":     "electron .",
+    "icons":     "node scripts/generate-icons.js",
+    "build":     "npm run icons && electron-builder",
+    "build:mac": "npm run icons && electron-builder --mac",
+    "build:win": "npm run icons && electron-builder --win"
   },
   "build": {
-    "appId":       "app.overdesk.checklist",
+    "appId": "app.overdesk.checklist",
     "productName": "Overdesk Checklist",
-    "copyright":   "Copyright © 2025 Overdesk",
-    "icon":        "build/icon",
+    "copyright": "Copyright © 2025 Overdesk",
+    "icon": "build/icon",
     "files": [
       "main.js",
       "src/**/*",
@@ -29,41 +28,38 @@
       { "from": "build/icon.png", "to": "icon.png" }
     ],
     "mac": {
-      "category":   "public.app-category.productivity",
+      "category": "public.app-category.productivity",
       "target": [
-        { "target": "dmg",  "arch": ["arm64", "x64"] },
-        { "target": "zip",  "arch": ["arm64", "x64"] }
+        { "target": "zip", "arch": ["arm64", "x64"] }
       ],
       "darkModeSupport": true,
       "identity": null
     },
-    "dmg": {
-      "title": "Overdesk Checklist"
-    },
     "win": {
-    "target": [
-  { "target": "zip", "arch": ["arm64", "x64"] }
-],
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
     },
     "nsis": {
-      "oneClick":           true,
-      "perMachine":         false,
+      "oneClick": true,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": false,
       "createStartMenuShortcut": true
     },
     "publish": {
       "provider": "github",
-      "owner":    "Bl3551nq",
-      "repo":     "overdesk-checklist"
+      "owner": "Bl3551nq",
+      "repo": "overdesk-checklist"
     }
   },
   "dependencies": {
     "electron-updater": "^6.1.7"
   },
   "devDependencies": {
-    "@resvg/resvg-js":  "^2.6.0",
-    "electron":         "^29.0.0",
+    "@resvg/resvg-js": "^2.6.0",
+    "electron": "^29.0.0",
     "electron-builder": "^24.9.1"
   }
 }
