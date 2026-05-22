@@ -1,8 +1,8 @@
 /**
  * generate-icons.js
- * Converts assets/icon.svg → build/icon.png (512px)
- * electron-builder then auto-generates .ico (Windows) and .icns (macOS) from it.
- * Also emits build/icon-32.png for use as tray icon reference.
+ * Converts assets/icon.svg → multiple PNGs in build/
+ * electron-builder uses build/icon.png (512px) to auto-generate .ico (Windows)
+ * and .icns (macOS) — the .ico embeds 16/32/48/256px frames automatically.
  */
 
 const { Resvg } = require('@resvg/resvg-js')
@@ -21,13 +21,23 @@ function render(size, outFile) {
     fitTo: { mode: 'width', value: size },
     background: 'transparent',
   })
-  const rendered = resvg.render()
-  const png = rendered.asPng()
+  const png = resvg.render().asPng()
   fs.writeFileSync(path.join(BUILD, outFile), png)
   console.log(`  ✓  build/${outFile}  (${size}×${size})`)
 }
 
 console.log('\n⬡  Generating Overdesk icons…\n')
-render(512, 'icon.png')    // app icon — electron-builder uses this for ICO + ICNS
-render(32,  'icon-32.png') // tray source (nativeImage resizes at runtime)
+
+// 512px — electron-builder's source for ICO (multi-frame) and ICNS
+render(512, 'icon.png')
+
+// 256px — Windows taskbar high-DPI
+render(256, 'icon-256.png')
+
+// 32px — tray icon source (nativeImage resizes at runtime)
+render(32, 'icon-32.png')
+
+// 16px — tray fallback
+render(16, 'icon-16.png')
+
 console.log('\n   Done.\n')

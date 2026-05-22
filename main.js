@@ -6,16 +6,13 @@ const { autoUpdater } = require('electron-updater')
 const path = require('path')
 const fs   = require('fs')
 
-// ─── Env ────────────────────────────────────────────────
 const IS_MAC = process.platform === 'darwin'
 const IS_WIN = process.platform === 'win32'
 const IS_DEV = !app.isPackaged
 
-// ─── Paths ──────────────────────────────────────────────
 const USERDATA     = app.getPath('userData')
 const LICENSE_FILE = path.join(USERDATA, 'license.json')
 
-/** Resolve a runtime asset: dev = ./build/, packaged = resources/ */
 function res(file) {
   return IS_DEV
     ? path.join(__dirname, 'build', file)
@@ -32,21 +29,27 @@ function saveLicense(key) {
   fs.writeFileSync(LICENSE_FILE, JSON.stringify({ key, ts: Date.now() }))
 }
 
-// ─── State ──────────────────────────────────────────────
+// ─── Window state ────────────────────────────────────────
 let tray    = null
 let mainWin = null
 let actWin  = null
 
+// Base card dimensions (at scale 1.0)
+const BASE_W = 380
+const BASE_H = 640
+
 // ─── Activation window ──────────────────────────────────
 function createActivateWin() {
   actWin = new BrowserWindow({
-    width:       420,
-    height:      600,
-    frame:       false,
-    transparent: true,
-    resizable:   false,
-    alwaysOnTop: true,
-    center:      true,
+    width:           440,
+    height:          620,
+    frame:           false,
+    transparent:     true,
+    backgroundColor: '#00000000',   // fully transparent
+    resizable:       false,
+    alwaysOnTop:     true,
+    center:          true,
+    icon:            res('icon.png'),
     webPreferences: {
       preload:          path.join(__dirname, 'src', 'preload.js'),
       contextIsolation: true,
@@ -63,16 +66,18 @@ function createMainWin() {
   const { width } = screen.getPrimaryDisplay().workAreaSize
 
   mainWin = new BrowserWindow({
-    width:       380,
-    height:      640,
-    x:           width - 420,
-    y:           60,
-    frame:       false,
-    transparent: true,
-    resizable:   false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    hasShadow:   true,
+    width:           BASE_W,
+    height:          BASE_H,
+    x:               width - BASE_W - 40,
+    y:               60,
+    frame:           false,
+    transparent:     true,
+    backgroundColor: '#00000000',   // fully transparent — removes the grey box
+    resizable:       true,          // must be true for programmatic resize to work
+    alwaysOnTop:     true,
+    skipTaskbar:     false,         // show in taskbar so icon appears
+    hasShadow:       false,         // shadow is baked into the card CSS
+    icon:            res('icon.png'),// full-size taskbar / dock icon
     webPreferences: {
       preload:          path.join(__dirname, 'src', 'preload.js'),
       contextIsolation: true,
@@ -83,31 +88,16 @@ function createMainWin() {
   mainWin.loadFile(path.join(__dirname, 'src', 'checklist.html'))
 
   mainWin.webContents.on('did-finish-load', () => {
-    // Native window drag via CSS — no JS translate conflicts
+    // ── Drag: ONLY the top header strip drags the window.
+    // Everything else — modes, options, picker, title — stays fully clickable.
     mainWin.webContents.insertCSS(`
-      #card { -webkit-app-region: drag; }
-      button, input, select, textarea, a, label,
-      #options-list, .opt, .left-handle, .minimize-pill,
-      .mode-btn, .icon-btn, .theme-btn, .close-btn,
-      .picker-overlay, .picker-inner, [onclick], [oninput] {
-        -webkit-app-region: no-drag;
-      }
-    `)
-    // Block HTML's JS translate-drag so the whole window moves instead
-    mainWin.webContents.executeJavaScript(`
-      (function () {
-        var card = document.getElementById('card');
-        if (!card) return;
-        card.style.transform = 'none';
-        card.addEventListener('mousedown', function (e) {
-          var skip = e.target.closest(
-            'button, input, select, a, label, ' +
-            '#options-list, .opt, .left-handle, .minimize-pill, ' +
-            '.mode-btn, .icon-btn, .theme-btn, .close-btn, .picker-overlay'
-          );
-          if (!skip) e.stopImmediatePropagation();
-        }, true);
-      })();
+      html, body { background: transparent !important; }
+
+      /* Only the drag-corner handle moves the window */
+      #drag-corner { -webkit-app-region: drag !important; }
+
+      /* Everything else is never a drag target */
+      #card, #card * { -webkit-app-region: no-drag; }
     `)
   })
 
@@ -119,44 +109,30 @@ function createMainWin() {
 function setupTray() {
   const raw = nativeImage.createFromPath(res('icon.png'))
   const img = raw.resize({ width: 16, height: 16 })
-  if (IS_MAC) img.setTemplateImage(true)  // adapts to dark/light menu bar
+  if (IS_MAC) img.setTemplateImage(true)
 
   tray = new Tray(img)
   tray.setToolTip('Overdesk Checklist')
 
   const ctxMenu = Menu.buildFromTemplate([
-    { label: 'Show', click: () => { if (mainWin) mainWin.show(); else createMainWin() } },
-    { label: 'Hide', click: () => { if (mainWin) mainWin.hide() } },
+    { label: 'Show',         click: () => { if (mainWin) mainWin.show(); else createMainWin() } },
+    { label: 'Hide',         click: () => { if (mainWin) mainWin.hide() } },
     { type: 'separator' },
     { label: 'Quit Overdesk', click: () => app.quit() },
   ])
   tray.setContextMenu(ctxMenu)
-
-  tray.on('click',       () => { if (mainWin) mainWin.isVisible() ? mainWin.hide() : mainWin.show() })
-  tray.on('double-click',() => { if (mainWin) mainWin.show() })
+  tray.on('click',        () => { if (mainWin) mainWin.isVisible() ? mainWin.hide() : mainWin.show() })
+  tray.on('double-click', () => { if (mainWin) mainWin.show() })
 }
 
-// ─── Auto-updater config ─────────────────────────────────
+// ─── Auto-updater ────────────────────────────────────────
 function setupUpdater() {
-  // Only run in packaged app
   if (IS_DEV) return
-
-  autoUpdater.autoDownload    = true   // download silently in background
-  autoUpdater.autoInstallOnAppQuit = false  // don't force-quit, let user decide
-
-  autoUpdater.on('update-available', info => {
-    if (mainWin) mainWin.webContents.send('update-available', info.version)
-  })
-
-  autoUpdater.on('update-downloaded', info => {
-    if (mainWin) mainWin.webContents.send('update-downloaded', info.version)
-  })
-
-  autoUpdater.on('error', err => {
-    console.error('Updater error:', err.message)
-  })
-
-  // Check on launch, then every 4 hours
+  autoUpdater.autoDownload         = true
+  autoUpdater.autoInstallOnAppQuit = false
+  autoUpdater.on('update-available',  info => { if (mainWin) mainWin.webContents.send('update-available',  info.version) })
+  autoUpdater.on('update-downloaded', info => { if (mainWin) mainWin.webContents.send('update-downloaded', info.version) })
+  autoUpdater.on('error', err => console.error('Updater:', err.message))
   autoUpdater.checkForUpdates()
   setInterval(() => autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1000)
 }
@@ -164,33 +140,18 @@ function setupUpdater() {
 // ─── App lifecycle ───────────────────────────────────────
 app.whenReady().then(() => {
   if (IS_MAC) app.dock.hide()
-
   setupTray()
   setupUpdater()
-
-  if (readLicense()?.key) {
-    createMainWin()
-  } else {
-    createActivateWin()
-  }
+  readLicense()?.key ? createMainWin() : createActivateWin()
 })
 
-// Keep alive in tray when all windows close
 app.on('window-all-closed', e => e.preventDefault())
 
 // ─── IPC ─────────────────────────────────────────────────
-ipcMain.handle('check-license', () => ({
-  activated: !!readLicense()?.key
-}))
+ipcMain.handle('check-license', () => ({ activated: !!readLicense()?.key }))
 
-ipcMain.handle('activate-license', (_, key) => {
-  saveLicense(key)
-  return { ok: true }
-})
-ipcMain.handle('validate-license', (_, key) => {
-  saveLicense(key)
-  return { ok: true }
-})
+ipcMain.handle('activate-license', (_, key) => { saveLicense(key); return { ok: true } })
+ipcMain.handle('validate-license', (_, key) => { saveLicense(key); return { ok: true } })
 
 ipcMain.handle('launch-app', () => {
   if (actWin) { actWin.close(); actWin = null }
@@ -206,13 +167,27 @@ ipcMain.handle('set-always-on-top', (_, flag) => {
   if (mainWin) mainWin.setAlwaysOnTop(flag, 'floating')
 })
 
-ipcMain.handle('scale-end', (_, scale) => {
+// Scale: scaleStart just stores the current window position for reference
+ipcMain.handle('scale-start', () => {
   if (!mainWin) return
-  const base    = { w: 380, h: 640 }
-  const clamped = Math.min(Math.max(scale, 0.7), 1.4)
-  mainWin.setSize(Math.round(base.w * clamped), Math.round(base.h * clamped))
+  const [x, y] = mainWin.getPosition()
+  return { x, y }
 })
 
-ipcMain.handle('install-update', () => {
-  autoUpdater.quitAndInstall(false, true)  // silent=false, forceRunAfter=true
+// Scale: resize the window proportionally so the card never clips
+ipcMain.handle('scale-end', (_, scale) => {
+  if (!mainWin) return
+  const clamped = Math.min(Math.max(scale, 0.6), 1.8)
+  const newW = Math.round(BASE_W * clamped)
+  const newH = Math.round(BASE_H * clamped)
+  // Keep window centered on its current position
+  const [cx, cy] = mainWin.getPosition()
+  const [ow, oh] = mainWin.getSize()
+  mainWin.setSize(newW, newH)
+  mainWin.setPosition(
+    Math.round(cx - (newW - ow) / 2),
+    Math.round(cy - (newH - oh) / 2)
+  )
 })
+
+ipcMain.handle('install-update', () => autoUpdater.quitAndInstall(false, true))

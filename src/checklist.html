@@ -598,12 +598,14 @@ body.editing .icon-btn::after{
 .color-custom-input{ position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
 /* ── Drag cursor only applied via JS during actual mousedown ── */
 .drag-corner{
-  position:absolute; bottom:0; left:0;
-  width:60px; height:60px;
-  border-radius:0 0 0 36px;
-  z-index:20;
-  pointer-events:none;
+  position:absolute; top:0; left:0; right:0;
+  height:54px;         /* covers the top bar — buttons sit on top via z-index */
+  border-radius:28px 28px 0 0;
+  z-index:1;           /* below buttons (z-index:10+) but above card bg */
+  pointer-events:auto; /* IPC drag target in Electron */
+  cursor:grab;
 }
+.drag-corner:active{ cursor:grabbing; }
 /* Interactive elements keep pointer cursor */
 button, input, .option, .icon-btn, .edit-toggle, .close-btn,
 .add-btn, .theme-switch, .minimize-pill, .minimize-bar,
@@ -614,7 +616,7 @@ button, input, .option, .icon-btn, .edit-toggle, .close-btn,
 .scroll-area { cursor: default; }
 </style>
 </head>
-<body>
+<body style="background:transparent;">
 
 <div class="card" id="card">
 

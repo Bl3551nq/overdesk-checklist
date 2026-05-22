@@ -12,10 +12,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Widget controls
   setAlwaysOnTop:  (flag)  => ipcRenderer.invoke('set-always-on-top', flag),
+  scaleStart:      ()      => ipcRenderer.invoke('scale-start'),
   scaleEnd:        (scale) => ipcRenderer.invoke('scale-end', scale),
 
   // Auto-updater
   installUpdate:      ()   => ipcRenderer.invoke('install-update'),
-  onUpdateAvailable:  (cb) => ipcRenderer.on('update-available',  cb),
-  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', cb),
+  onUpdateAvailable:  (cb) => ipcRenderer.on('update-available',  (_, v) => cb(v)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update-downloaded', (_, v) => cb(v)),
 })
