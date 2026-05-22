@@ -35,12 +35,11 @@
       "darkModeSupport": true,
       "identity": null
     },
-    "win": {
-      "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
-      ]
-    },
+   "win": {
+  "target": [
+    { "target": "nsis", "arch": ["x64"] }
+  ]
+},
     "nsis": {
       "oneClick": true,
       "perMachine": false,
