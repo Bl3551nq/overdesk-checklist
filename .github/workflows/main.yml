@@ -1,1 +1,58 @@
 
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            label: mac
+          - os: windows-latest
+            label: win
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate icons from SVG
+        run: node scripts/generate-icons.js
+
+      - name: Build & publish to GitHub Releases
+        run: npm run build:${{ matrix.label }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          WIN_CSC_LINK: ''
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: overdesk-${{ matrix.label }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/*.exe
+            dist/*-portable.exe
+          if-no-files-found: warn
