@@ -2,6 +2,7 @@ const {
   app, BrowserWindow, Tray, Menu,
   ipcMain, nativeImage, screen
 } = require('electron')
+
 const { autoUpdater } = require('electron-updater')
 const path = require('path')
 const fs   = require('fs')
@@ -15,6 +16,9 @@ const IS_DEV = !app.isPackaged
 const USERDATA     = app.getPath('userData')
 const LICENSE_FILE = path.join(USERDATA, 'license.json')
 
+// Owner bypass — never share this key
+const OWNER_KEY = 'OVERDESK-OWNER-BL3551NQ-2025';
+
 /** Resolve a runtime asset: dev = ./build/, packaged = resources/ */
 function res(file) {
   return IS_DEV
@@ -27,9 +31,58 @@ function readLicense() {
   try   { return JSON.parse(fs.readFileSync(LICENSE_FILE, 'utf8')) }
   catch { return null }
 }
+
 function saveLicense(key) {
   fs.mkdirSync(USERDATA, { recursive: true })
   fs.writeFileSync(LICENSE_FILE, JSON.stringify({ key, ts: Date.now() }))
+}
+
+// ─── Gumroad Verification ───────────────────────────────
+async function verifyWithGumroad(key) {
+
+  // Owner bypass
+  if (key === OWNER_KEY) {
+    return {
+      ok: true,
+      owner: true
+    }
+  }
+
+  try {
+    const response = await fetch('https://api.gumroad.com/v2/licenses/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        product_id: 'YOUR_GUMROAD_PRODUCT_ID',
+        license_key: key,
+        increment_uses_count: false
+      })
+    })
+
+    const data = await response.json()
+
+    if (data.success) {
+      return {
+        ok: true,
+        buyer: data.purchase?.email || null
+      }
+    }
+
+    return {
+      ok: false,
+      error: 'Invalid license key'
+    }
+
+  } catch (err) {
+    console.error('Gumroad verification failed:', err)
+
+    return {
+      ok: false,
+      error: 'Verification server error'
+    }
+  }
 }
 
 // ─── State ──────────────────────────────────────────────
@@ -53,8 +106,11 @@ function createActivateWin() {
       nodeIntegration:  false,
     }
   })
+
   actWin.loadFile(path.join(__dirname, 'src', 'activate.html'))
+
   if (IS_DEV) actWin.webContents.openDevTools({ mode: 'detach' })
+
   actWin.on('closed', () => { actWin = null })
 }
 
@@ -83,9 +139,10 @@ function createMainWin() {
   mainWin.loadFile(path.join(__dirname, 'src', 'checklist.html'))
 
   mainWin.webContents.on('did-finish-load', () => {
-    // Native window drag via CSS — no JS translate conflicts
+
     mainWin.webContents.insertCSS(`
       #card { -webkit-app-region: drag; }
+
       button, input, select, textarea, a, label,
       #options-list, .opt, .left-handle, .minimize-pill,
       .mode-btn, .icon-btn, .theme-btn, .close-btn,
@@ -93,77 +150,126 @@ function createMainWin() {
         -webkit-app-region: no-drag;
       }
     `)
-    // Block HTML's JS translate-drag so the whole window moves instead
+
     mainWin.webContents.executeJavaScript(`
       (function () {
         var card = document.getElementById('card');
+
         if (!card) return;
+
         card.style.transform = 'none';
+
         card.addEventListener('mousedown', function (e) {
+
           var skip = e.target.closest(
             'button, input, select, a, label, ' +
             '#options-list, .opt, .left-handle, .minimize-pill, ' +
             '.mode-btn, .icon-btn, .theme-btn, .close-btn, .picker-overlay'
           );
+
           if (!skip) e.stopImmediatePropagation();
+
         }, true);
+
       })();
     `)
+
   })
 
-  if (IS_DEV) mainWin.webContents.openDevTools({ mode: 'detach' })
-  mainWin.on('closed', () => { mainWin = null })
+  if (IS_DEV) {
+    mainWin.webContents.openDevTools({ mode: 'detach' })
+  }
+
+  mainWin.on('closed', () => {
+    mainWin = null
+  })
 }
 
 // ─── Tray ────────────────────────────────────────────────
 function setupTray() {
+
   const raw = nativeImage.createFromPath(res('icon.png'))
   const img = raw.resize({ width: 16, height: 16 })
-  if (IS_MAC) img.setTemplateImage(true)  // adapts to dark/light menu bar
+
+  if (IS_MAC) {
+    img.setTemplateImage(true)
+  }
 
   tray = new Tray(img)
+
   tray.setToolTip('Overdesk Checklist')
 
   const ctxMenu = Menu.buildFromTemplate([
-    { label: 'Show', click: () => { if (mainWin) mainWin.show(); else createMainWin() } },
-    { label: 'Hide', click: () => { if (mainWin) mainWin.hide() } },
+    {
+      label: 'Show',
+      click: () => {
+        if (mainWin) mainWin.show()
+        else createMainWin()
+      }
+    },
+    {
+      label: 'Hide',
+      click: () => {
+        if (mainWin) mainWin.hide()
+      }
+    },
     { type: 'separator' },
-    { label: 'Quit Overdesk', click: () => app.quit() },
+    {
+      label: 'Quit Overdesk',
+      click: () => app.quit()
+    },
   ])
+
   tray.setContextMenu(ctxMenu)
 
-  tray.on('click',       () => { if (mainWin) mainWin.isVisible() ? mainWin.hide() : mainWin.show() })
-  tray.on('double-click',() => { if (mainWin) mainWin.show() })
+  tray.on('click', () => {
+    if (mainWin) {
+      mainWin.isVisible() ? mainWin.hide() : mainWin.show()
+    }
+  })
+
+  tray.on('double-click', () => {
+    if (mainWin) mainWin.show()
+  })
 }
 
 // ─── Auto-updater config ─────────────────────────────────
 function setupUpdater() {
-  // Only run in packaged app
+
   if (IS_DEV) return
 
-  autoUpdater.autoDownload    = true   // download silently in background
-  autoUpdater.autoInstallOnAppQuit = false  // don't force-quit, let user decide
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = false
 
   autoUpdater.on('update-available', info => {
-    if (mainWin) mainWin.webContents.send('update-available', info.version)
+    if (mainWin) {
+      mainWin.webContents.send('update-available', info.version)
+    }
   })
 
   autoUpdater.on('update-downloaded', info => {
-    if (mainWin) mainWin.webContents.send('update-downloaded', info.version)
+    if (mainWin) {
+      mainWin.webContents.send('update-downloaded', info.version)
+    }
   })
 
   autoUpdater.on('error', err => {
     console.error('Updater error:', err.message)
   })
 
-  // Check on launch, then every 4 hours
   autoUpdater.checkForUpdates()
-  setInterval(() => autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1000)
+
+  setInterval(() => {
+    autoUpdater.checkForUpdates()
+  }, 4 * 60 * 60 * 1000)
 }
 
 // ─── App lifecycle ───────────────────────────────────────
 app.whenReady().then(() => {
-  if (IS_MAC) app.dock.hide()
+
+  if (IS_MAC) {
+    app.dock.hide()
+  }
 
   setupTray()
   setupUpdater()
@@ -173,6 +279,7 @@ app.whenReady().then(() => {
   } else {
     createActivateWin()
   }
+
 })
 
 // Keep alive in tray when all windows close
@@ -183,36 +290,73 @@ ipcMain.handle('check-license', () => ({
   activated: !!readLicense()?.key
 }))
 
-ipcMain.handle('activate-license', (_, key) => {
-  saveLicense(key)
-  return { ok: true }
+ipcMain.handle('activate-license', async (_, key) => {
+
+  const result = await verifyWithGumroad(key)
+
+  if (result.ok) {
+    saveLicense(key)
+  }
+
+  return result
 })
-ipcMain.handle('validate-license', (_, key) => {
-  saveLicense(key)
-  return { ok: true }
+
+ipcMain.handle('validate-license', async (_, key) => {
+
+  const result = await verifyWithGumroad(key)
+
+  if (result.ok) {
+    saveLicense(key)
+  }
+
+  return result
 })
 
 ipcMain.handle('launch-app', () => {
-  if (actWin) { actWin.close(); actWin = null }
+
+  if (actWin) {
+    actWin.close()
+    actWin = null
+  }
+
   createMainWin()
+
 })
 
 ipcMain.handle('close-app', event => {
+
   const win = BrowserWindow.fromWebContents(event.sender)
-  if (win) win.hide()
+
+  if (win) {
+    win.hide()
+  }
+
 })
 
 ipcMain.handle('set-always-on-top', (_, flag) => {
-  if (mainWin) mainWin.setAlwaysOnTop(flag, 'floating')
+  if (mainWin) {
+    mainWin.setAlwaysOnTop(flag, 'floating')
+  }
 })
 
 ipcMain.handle('scale-end', (_, scale) => {
+
   if (!mainWin) return
-  const base    = { w: 380, h: 640 }
+
+  const base = {
+    w: 380,
+    h: 640
+  }
+
   const clamped = Math.min(Math.max(scale, 0.7), 1.4)
-  mainWin.setSize(Math.round(base.w * clamped), Math.round(base.h * clamped))
+
+  mainWin.setSize(
+    Math.round(base.w * clamped),
+    Math.round(base.h * clamped)
+  )
+
 })
 
 ipcMain.handle('install-update', () => {
-  autoUpdater.quitAndInstall(false, true)  // silent=false, forceRunAfter=true
+  autoUpdater.quitAndInstall(false, true)
 })
