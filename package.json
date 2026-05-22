@@ -1,6 +1,6 @@
 {
   "name": "overdesk-checklist",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Overdesk Checklist — floating productivity widget",
   "main": "main.js",
   "author": {
@@ -35,11 +35,11 @@
       "darkModeSupport": true,
       "identity": null
     },
-   "win": {
-  "target": [
-    { "target": "nsis", "arch": ["x64"] }
-  ]
-},
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
