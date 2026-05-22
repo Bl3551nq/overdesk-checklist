@@ -6,12 +6,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   activateLicense: (key)   => ipcRenderer.invoke('activate-license', key),
   validateLicense: (key)   => ipcRenderer.invoke('validate-license', key),
 
-  // Window flow
+  // Window
   launchApp:       ()      => ipcRenderer.invoke('launch-app'),
   closeApp:        ()      => ipcRenderer.invoke('close-app'),
-
-  // Widget controls
   setAlwaysOnTop:  (flag)  => ipcRenderer.invoke('set-always-on-top', flag),
+
+  // Drag — fire and forget (ipcRenderer.send, not invoke)
+  startDrag:       ()      => ipcRenderer.send('start-drag'),
+
+  // Scale
   scaleStart:      ()      => ipcRenderer.invoke('scale-start'),
   scaleEnd:        (scale) => ipcRenderer.invoke('scale-end', scale),
 

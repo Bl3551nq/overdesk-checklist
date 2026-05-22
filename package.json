@@ -1,6 +1,6 @@
 {
   "name": "overdesk-checklist",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Overdesk Checklist \u2014 floating productivity widget",
   "main": "main.js",
   "author": {

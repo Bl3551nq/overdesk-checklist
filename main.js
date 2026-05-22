@@ -29,12 +29,10 @@ function saveLicense(key) {
   fs.writeFileSync(LICENSE_FILE, JSON.stringify({ key, ts: Date.now() }))
 }
 
-// ─── Window state ────────────────────────────────────────
 let tray    = null
 let mainWin = null
 let actWin  = null
 
-// Base card dimensions (at scale 1.0)
 const BASE_W = 380
 const BASE_H = 640
 
@@ -45,7 +43,7 @@ function createActivateWin() {
     height:          620,
     frame:           false,
     transparent:     true,
-    backgroundColor: '#00000000',   // fully transparent
+    backgroundColor: '#00000000',
     resizable:       false,
     alwaysOnTop:     true,
     center:          true,
@@ -72,12 +70,12 @@ function createMainWin() {
     y:               60,
     frame:           false,
     transparent:     true,
-    backgroundColor: '#00000000',   // fully transparent — removes the grey box
-    resizable:       true,          // must be true for programmatic resize to work
+    backgroundColor: '#00000000',
+    resizable:       true,
     alwaysOnTop:     true,
-    skipTaskbar:     false,         // show in taskbar so icon appears
-    hasShadow:       false,         // shadow is baked into the card CSS
-    icon:            res('icon.png'),// full-size taskbar / dock icon
+    skipTaskbar:     false,
+    hasShadow:       false,
+    icon:            res('icon.png'),
     webPreferences: {
       preload:          path.join(__dirname, 'src', 'preload.js'),
       contextIsolation: true,
@@ -88,16 +86,11 @@ function createMainWin() {
   mainWin.loadFile(path.join(__dirname, 'src', 'checklist.html'))
 
   mainWin.webContents.on('did-finish-load', () => {
-    // ── Drag: ONLY the top header strip drags the window.
-    // Everything else — modes, options, picker, title — stays fully clickable.
+    // Only inject transparency — NO -webkit-app-region at all.
+    // Dragging is handled by startWindowDragging() via IPC instead,
+    // which means all JS mouse events work normally everywhere.
     mainWin.webContents.insertCSS(`
-      html, body { background: transparent !important; }
-
-      /* Only the drag-corner handle moves the window */
-      #drag-corner { -webkit-app-region: drag !important; }
-
-      /* Everything else is never a drag target */
-      #card, #card * { -webkit-app-region: no-drag; }
+      html, body { background: transparent !important; margin: 0; padding: 0; }
     `)
   })
 
@@ -115,8 +108,8 @@ function setupTray() {
   tray.setToolTip('Overdesk Checklist')
 
   const ctxMenu = Menu.buildFromTemplate([
-    { label: 'Show',         click: () => { if (mainWin) mainWin.show(); else createMainWin() } },
-    { label: 'Hide',         click: () => { if (mainWin) mainWin.hide() } },
+    { label: 'Show',  click: () => { if (mainWin) mainWin.show(); else createMainWin() } },
+    { label: 'Hide',  click: () => { if (mainWin) mainWin.hide() } },
     { type: 'separator' },
     { label: 'Quit Overdesk', click: () => app.quit() },
   ])
@@ -128,8 +121,8 @@ function setupTray() {
 // ─── Auto-updater ────────────────────────────────────────
 function setupUpdater() {
   if (IS_DEV) return
-  autoUpdater.autoDownload         = true
-  autoUpdater.autoInstallOnAppQuit = false
+  autoUpdater.autoDownload             = true
+  autoUpdater.autoInstallOnAppQuit     = false
   autoUpdater.on('update-available',  info => { if (mainWin) mainWin.webContents.send('update-available',  info.version) })
   autoUpdater.on('update-downloaded', info => { if (mainWin) mainWin.webContents.send('update-downloaded', info.version) })
   autoUpdater.on('error', err => console.error('Updater:', err.message))
@@ -148,8 +141,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', e => e.preventDefault())
 
 // ─── IPC ─────────────────────────────────────────────────
-ipcMain.handle('check-license', () => ({ activated: !!readLicense()?.key }))
-
+ipcMain.handle('check-license',    ()       => ({ activated: !!readLicense()?.key }))
 ipcMain.handle('activate-license', (_, key) => { saveLicense(key); return { ok: true } })
 ipcMain.handle('validate-license', (_, key) => { saveLicense(key); return { ok: true } })
 
@@ -167,23 +159,30 @@ ipcMain.handle('set-always-on-top', (_, flag) => {
   if (mainWin) mainWin.setAlwaysOnTop(flag, 'floating')
 })
 
-// Scale: scaleStart just stores the current window position for reference
+// ── Native window drag via startWindowDragging() ─────────
+// Called on mousedown on the drag area — no CSS regions needed.
+// This is fire-and-forget so we use ipcMain.on (not handle).
+ipcMain.on('start-drag', event => {
+  const win = BrowserWindow.fromWebContents(event.sender)
+  if (win) win.startWindowDragging()
+})
+
+// ── Scale: resize window to match card CSS scale ──────────
 ipcMain.handle('scale-start', () => {
-  if (!mainWin) return
+  if (!mainWin) return null
   const [x, y] = mainWin.getPosition()
   return { x, y }
 })
 
-// Scale: resize the window proportionally so the card never clips
 ipcMain.handle('scale-end', (_, scale) => {
   if (!mainWin) return
-  const clamped = Math.min(Math.max(scale, 0.6), 1.8)
-  const newW = Math.round(BASE_W * clamped)
-  const newH = Math.round(BASE_H * clamped)
-  // Keep window centered on its current position
+  const clamped = Math.min(Math.max(scale, 0.5), 2.0)
+  const newW    = Math.round(BASE_W * clamped)
+  const newH    = Math.round(BASE_H * clamped)
   const [cx, cy] = mainWin.getPosition()
   const [ow, oh] = mainWin.getSize()
   mainWin.setSize(newW, newH)
+  // Keep the card centred on its previous position
   mainWin.setPosition(
     Math.round(cx - (newW - ow) / 2),
     Math.round(cy - (newH - oh) / 2)
