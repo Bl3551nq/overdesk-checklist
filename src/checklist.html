@@ -89,6 +89,7 @@ html, body {
 .top-bar{
   display:flex; align-items:center; justify-content:space-between;
   margin-bottom:14px; flex-shrink:0; position:relative;
+  z-index:10;          /* above drag-corner (z-index:1) */
 }
 
 /* ── Theme toggle switch ──── */
@@ -598,13 +599,13 @@ body.editing .icon-btn::after{
 .color-custom-input{ position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
 /* ── Drag cursor only applied via JS during actual mousedown ── */
 .drag-corner{
-  position:absolute;top:0;left:0;right:0;
-  height:54px;
-  border-radius:28px 28px 0 0;
-  z-index:1;
+  position:absolute; top:8px; left:60px; right:100px;
+  height:38px;         /* only the middle gap between left and right controls */
+  border-radius:12px;
+  z-index:2;           /* above card bg, below buttons (z-index:10) */
   cursor:grab;
 }
-.drag-corner:active{cursor:grabbing;}
+.drag-corner:active{ cursor:grabbing; }
 /* Interactive elements keep pointer cursor */
 button, input, .option, .icon-btn, .edit-toggle, .close-btn,
 .add-btn, .theme-switch, .minimize-pill, .minimize-bar,
@@ -1332,19 +1333,7 @@ function switchMode(mode,btn){
   },180);
 }
 
-/* ─── Card bounds — main polls cursor against these for click-through ── */
-(function(){
-  if(!window.electronAPI)return;
-  const card=document.getElementById('card');
-  if(!card)return;
-  function send(){
-    const r=card.getBoundingClientRect();
-    window.electronAPI.cardBounds({x:r.left,y:r.top,w:r.width,h:r.height});
-  }
-  send();
-  new ResizeObserver(send).observe(card);
-  new MutationObserver(send).observe(card,{attributes:true,attributeFilter:['class','style']});
-})();
+/* cardBounds removed — not needed */
 
 /* ─── Scale + Drag — unified transform: translate(tx,ty) scale(s) ─── */
 (function(){
@@ -1418,11 +1407,11 @@ function switchMode(mode,btn){
 
   document.addEventListener('mousemove', e => {
     if(!scaleDragging) return;
-    setScale(scaleStartS + (scaleStartX - e.screenX) / 300);
+    setScale(scaleStartS + (e.screenX - scaleStartX) / 300);
   });
   document.addEventListener('touchmove', e => {
     if(!scaleDragging) return;
-    setScale(scaleStartS + (scaleStartX - e.touches[0].screenX) / 300);
+    setScale(scaleStartS + (e.touches[0].screenX - scaleStartX) / 300);
     e.preventDefault();
   }, {passive:false});
   document.addEventListener('mouseup', () => {

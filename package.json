@@ -1,68 +1,91 @@
 {
   "name": "overdesk-checklist",
-  "version": "1.0.0",
-  "description": "Overdesk Checklist — floating productivity widget",
+  "version": "1.0.1",
+  "description": "Overdesk Checklist \u2014 floating productivity widget",
   "main": "main.js",
   "author": {
     "name": "Overdesk",
     "email": "overdesk.app@gmail.com"
   },
   "scripts": {
-    "start":     "electron .",
-    "icons":     "node scripts/generate-icons.js",
-    "build":     "npm run icons && electron-builder",
+    "start": "electron .",
+    "icons": "node scripts/generate-icons.js",
+    "build": "npm run icons && electron-builder",
     "build:mac": "npm run icons && electron-builder --mac",
     "build:win": "npm run icons && electron-builder --win"
   },
   "build": {
-    "appId":       "app.overdesk.checklist",
+    "appId": "app.overdesk.checklist",
     "productName": "Overdesk Checklist",
-    "copyright":   "Copyright © 2025 Overdesk",
-    "icon":        "build/icon",
+    "copyright": "Copyright \u00a9 2025 Overdesk",
+    "icon": "build/icon",
     "files": [
       "main.js",
       "src/**/*",
       "assets/**/*"
     ],
     "extraResources": [
-      { "from": "build/icon.png",     "to": "icon.png"     },
-      { "from": "build/icon-256.png", "to": "icon-256.png" },
-      { "from": "build/icon-32.png",  "to": "icon-32.png"  },
-      { "from": "build/icon-16.png",  "to": "icon-16.png"  }
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      },
+      {
+        "from": "build/icon-256.png",
+        "to": "icon-256.png"
+      },
+      {
+        "from": "build/icon-32.png",
+        "to": "icon-32.png"
+      },
+      {
+        "from": "build/icon-16.png",
+        "to": "icon-16.png"
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
-        { "target": "zip", "arch": ["arm64", "x64"] }
+        {
+          "target": "zip",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "darkModeSupport": true,
       "identity": null
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
-      "oneClick":                          true,
-      "perMachine":                        false,
+      "oneClick": true,
+      "perMachine": false,
       "allowToChangeInstallationDirectory": false,
-      "createDesktopShortcut":             true,
-      "createStartMenuShortcut":           true,
-      "runAfterFinish":                    true
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "runAfterFinish": true
     },
     "publish": {
       "provider": "github",
-      "owner":    "Bl3551nq",
-      "repo":     "overdesk-checklist"
+      "owner": "Bl3551nq",
+      "repo": "overdesk-checklist"
     }
   },
   "dependencies": {
     "electron-updater": "^6.1.7"
   },
   "devDependencies": {
-    "@resvg/resvg-js":  "^2.6.0",
-    "electron":         "^29.0.0",
+    "@resvg/resvg-js": "^2.6.0",
+    "electron": "^29.0.0",
     "electron-builder": "^24.9.1"
   }
 }
