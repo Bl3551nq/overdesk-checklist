@@ -1,96 +1,81 @@
-# Overdesk Checklist
+# Overdesk Checklist v1.0.0
 
-Floating productivity widget for Windows & macOS. Lives in the system tray.
+Floating productivity widget. Lives in the system tray. Drag anywhere on screen.
 
 ---
 
-## First time setup (do this once)
+## First time setup
 
 ### 1. Install Node.js
-Download from https://nodejs.org — install the LTS version.
+https://nodejs.org — LTS version
 
-### 2. Create a private GitHub repo
-- Go to https://github.com/new
+### 2. Create private GitHub repo
+- https://github.com/new
 - Name: `overdesk-checklist`
 - Visibility: **Private**
-- Click **Create repository**
+- Settings → Actions → General → **Read and write permissions** → Save
 
-### 3. Enable Actions write permission
-In your new repo:
-- Settings → Actions → General
-- Scroll to "Workflow permissions"
-- Select **Read and write permissions**
-- Click Save
-
-### 4. Push this code
-Open Terminal (Mac) or Command Prompt (Windows) in this folder and run:
-
+### 3. Push
 ```bash
 npm install
 git init
 git add .
-git commit -m "Initial commit"
+git commit -m "v1.0.0"
 git branch -M main
 git remote add origin https://github.com/Bl3551nq/overdesk-checklist.git
 git push -u origin main
 ```
 
+### 4. Build
+```bash
+git tag v1.0.0
+git push origin main --tags
+```
+Watch: github.com/Bl3551nq/overdesk-checklist/actions (~8 min)
+Download from: github.com/Bl3551nq/overdesk-checklist/releases
+
 ---
 
-## Building the app (every release)
+## Releasing updates (users auto-update, no reinstall needed)
 
 ```bash
-# 1. Bump the version in package.json  e.g. "version": "1.0.1"
-# 2. Commit the change
+# Bump "version" in package.json first, then:
 git add package.json
 git commit -m "v1.0.1"
-
-# 3. Tag and push — this triggers the automatic build
 git tag v1.0.1
 git push origin main --tags
 ```
 
-Then go to **github.com/Bl3551nq/overdesk-checklist/actions** to watch the build.
-When it finishes (~8 min), the `.dmg` (Mac) and `.exe` (Windows) appear under
-**github.com/Bl3551nq/overdesk-checklist/releases**
+---
+
+## Owner key (for testing without Gumroad)
+```
+OVERDESK-BL3551NQ-OWNER000-KEY02025
+```
 
 ---
 
-## Auto-updates (zero effort for your users)
-
-When you release a new version (tag + push), existing installs silently
-download the update in the background. The app shows a banner asking
-the user to restart — no re-downloading from Gumroad needed.
-
----
-
-## How the license works
-
-1. First launch → activation screen appears
-2. User pastes their Gumroad key (XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX)
-3. App verifies against https://overdesk.gumroad.com/l/app3
-4. Key saved locally — activation screen never shows again
-5. Future launches go straight to the widget
+## License flow
+1. First launch → activation screen
+2. User enters Gumroad key (XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX)
+3. Verified via https://overdesk.gumroad.com/l/app3
+4. Key stored locally — never asked again
 
 ---
 
 ## Project structure
-
 ```
 overdesk-checklist/
-├── .github/workflows/build.yml   ← Auto-builds on every git tag
-├── scripts/generate-icons.js     ← Converts icon.svg → PNG for all platforms
+├── .github/workflows/build.yml   ← auto-build on git tag
+├── scripts/generate-icons.js     ← SVG → square PNG icons
 ├── src/
-│   ├── activate.html             ← One-time license activation screen
-│   ├── checklist.html            ← Main floating widget
-│   └── preload.js                ← Bridge between UI and Electron
-├── assets/
-│   └── icon.svg                  ← Your logo (source of all icons)
+│   ├── activate.html             ← one-time license screen
+│   ├── checklist.html            ← main floating widget
+│   └── preload.js                ← Electron IPC bridge
+├── assets/icon.svg               ← source logo
 ├── main.js                       ← Electron main process
 └── package.json
 ```
-
----
 
 ## Support
 overdesk.app@gmail.com

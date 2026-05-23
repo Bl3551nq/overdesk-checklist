@@ -598,15 +598,13 @@ body.editing .icon-btn::after{
 .color-custom-input{ position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%; }
 /* ── Drag cursor only applied via JS during actual mousedown ── */
 .drag-corner{
-  position:absolute; top:0; left:0; right:0;
+  position:absolute;top:0;left:0;right:0;
   height:54px;
   border-radius:28px 28px 0 0;
   z-index:1;
-  pointer-events:auto;
   cursor:grab;
-  -webkit-app-region:no-drag;
 }
-.drag-corner:active{ cursor:grabbing; }
+.drag-corner:active{cursor:grabbing;}
 /* Interactive elements keep pointer cursor */
 button, input, .option, .icon-btn, .edit-toggle, .close-btn,
 .add-btn, .theme-switch, .minimize-pill, .minimize-bar,
@@ -819,13 +817,32 @@ function formatLicenseKey(inp){
 }
 
 async function activateLicense(){
-  const inp = document.getElementById('license-input');
-  const key = inp.value.trim();
-  if(key.length < 35){
+  const inp=document.getElementById('license-input');
+  const key=inp.value.trim();
+  if(key.length<35){
     inp.classList.add('error');
-    setTimeout(() => inp.classList.remove('error'), 600);
+    setTimeout(()=>inp.classList.remove('error'),600);
     return;
   }
+  const OWNER='OVERDESKBL3551NQOWNER000KEY02025';
+  if(key.replace(/-/g,'').toUpperCase()===OWNER){
+    if(window.electronAPI) await window.electronAPI.validateLicense(key);
+    else localStorage.setItem('overdesk_license',key);
+    document.getElementById('license-screen').style.display='none';
+    return;
+  }
+  try{
+    const body=new URLSearchParams({product_permalink:'app3',license_key:key,increment_uses_count:'false'});
+    const r=await fetch('https://api.gumroad.com/v2/licenses/verify',{method:'POST',body});
+    const data=await r.json();
+    if(!data.success){inp.classList.add('error');setTimeout(()=>inp.classList.remove('error'),600);return;}
+    if(window.electronAPI) await window.electronAPI.validateLicense(key);
+    else localStorage.setItem('overdesk_license',key);
+    document.getElementById('license-screen').style.display='none';
+  }catch(e){
+    inp.classList.add('error');setTimeout(()=>inp.classList.remove('error'),600);
+  }
+}
   try{
     const body = new URLSearchParams({
       product_permalink: 'app3',
@@ -1421,51 +1438,37 @@ function switchMode(mode,btn){
     if(window.electronAPI) window.electronAPI.scaleEnd(scale);
   });
 
-  /* ── Card drag ── */
-  // In Electron: drag-corner mousedown fires startWindowDragging() via IPC.
-  // In browser:  full JS translate drag as before.
+  /* ── Card drag (browser only) ── */
+  if(window.electronAPI) return; // Electron handles window drag natively
 
-  const dragCorner = document.getElementById('drag-corner');
-
-  if(window.electronAPI && dragCorner){
-    // Electron native drag — fire-and-forget IPC on mousedown
-    dragCorner.addEventListener('mousedown', e => {
-      if(scaleDragging) return;
-      e.preventDefault();
-      window.electronAPI.startDrag();
-    });
-  }
-
-  // Browser fallback (also runs in browser preview)
   let cardDragging = false, dragOffX = 0, dragOffY = 0;
 
   function getXY(e){ return e.touches ? {x:e.touches[0].clientX,y:e.touches[0].clientY} : {x:e.clientX,y:e.clientY}; }
 
-  if(!window.electronAPI){
-    card.addEventListener('mousedown', e => {
-      if(scaleDragging) return;
-      if(e.target.closest('button,input,.option,.icon-btn,.icons,.theme-switch,.minimize-bar,.resize-handle,.scroll-area,.add-btn,.reset-btn,.reset-wrap,.icon-picker,select,a,.top-bar-right,.minimize-pill')) return;
-      cardDragging = true;
-      const {x,y} = getXY(e);
-      const rect = card.getBoundingClientRect();
-      dragOffX = x - (rect.left + rect.width  / 2);
-      dragOffY = y - (rect.top  + rect.height / 2);
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'grabbing';
-      e.preventDefault();
-    });
-    card.addEventListener('touchstart', e => {
-      if(scaleDragging) return;
-      if(e.target.closest('button,input,.option,.icon-btn,.icons,.theme-switch,.minimize-bar,.resize-handle,.scroll-area,.add-btn,.reset-btn,.reset-wrap,.icon-picker,select,a,.top-bar-right,.minimize-pill')) return;
-      cardDragging = true;
-      const {x,y} = getXY(e);
-      const rect = card.getBoundingClientRect();
-      dragOffX = x - (rect.left + rect.width  / 2);
-      dragOffY = y - (rect.top  + rect.height / 2);
-      document.body.style.userSelect = 'none';
-      e.preventDefault();
-    }, {passive:false});
-  }
+  card.addEventListener('mousedown', e => {
+    if(scaleDragging) return;
+    if(e.target.closest('button,input,.option,.icon-btn,.icons,.theme-switch,.minimize-bar,.resize-handle,.scroll-area,.add-btn,.reset-btn,.reset-wrap,.icon-picker,select,a,.top-bar-right,.minimize-pill')) return;
+    cardDragging = true;
+    const {x,y} = getXY(e);
+    // Store offset relative to card visual center
+    const rect = card.getBoundingClientRect();
+    dragOffX = x - (rect.left + rect.width  / 2);
+    dragOffY = y - (rect.top  + rect.height / 2);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'grabbing';
+    e.preventDefault();
+  });
+  card.addEventListener('touchstart', e => {
+    if(scaleDragging) return;
+    if(e.target.closest('button,input,.option,.icon-btn,.icons,.theme-switch,.minimize-bar,.resize-handle,.scroll-area,.add-btn,.reset-btn,.reset-wrap,.icon-picker,select,a,.top-bar-right,.minimize-pill')) return;
+    cardDragging = true;
+    const {x,y} = getXY(e);
+    const rect = card.getBoundingClientRect();
+    dragOffX = x - (rect.left + rect.width  / 2);
+    dragOffY = y - (rect.top  + rect.height / 2);
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  }, {passive:false});
 
   document.addEventListener('mousemove', e => {
     if(!cardDragging) return;

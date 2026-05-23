@@ -1,17 +1,17 @@
 const {
   app, BrowserWindow, Tray, Menu,
-  ipcMain, ipcRenderer, nativeImage, screen
+  ipcMain, nativeImage, screen
 } = require('electron')
 const { autoUpdater } = require('electron-updater')
 const path = require('path')
 const fs   = require('fs')
 
-// ─── Env ────────────────────────────────────────────────
+// ─── Constants ──────────────────────────────────────────
 const IS_MAC = process.platform === 'darwin'
 const IS_WIN = process.platform === 'win32'
 const IS_DEV = !app.isPackaged
 
-// Windows: set App User Model ID so taskbar shows the right icon at full size
+// Windows taskbar: must be set before app.whenReady
 if (IS_WIN) app.setAppUserModelId('app.overdesk.checklist')
 
 // ─── Paths ──────────────────────────────────────────────
@@ -34,19 +34,20 @@ function saveLicense(key) {
   fs.writeFileSync(LICENSE_FILE, JSON.stringify({ key, ts: Date.now() }))
 }
 
-// ─── Window state ───────────────────────────────────────
+// ─── Window dimensions ──────────────────────────────────
+// Window is always MAX size so CSS scale never clips content.
+// Transparent overflow is invisible — only the card shadow shows.
+const BASE_W = 380
+const BASE_H = 640
+const MAX_W  = Math.ceil(BASE_W * 1.8) + 60   // 744
+const MAX_H  = Math.ceil(BASE_H * 1.8) + 60   // 1212
+
+// ─── State ──────────────────────────────────────────────
 let tray    = null
 let mainWin = null
 let actWin  = null
 
-// Card base dimensions at scale 1.0
-const BASE_W = 380
-const BASE_H = 640
-// Max window size at scale 1.8 — transparent overflow is invisible
-const MAX_W  = Math.ceil(BASE_W * 1.8) + 40   // 724
-const MAX_H  = Math.ceil(BASE_H * 1.8) + 40   // 1192
-
-// Drag state (for IPC-based window dragging)
+// IPC drag state
 let _dragStartMouse = null
 let _dragStartWin   = null
 
@@ -73,13 +74,11 @@ function createActivateWin() {
   actWin.on('closed', () => { actWin = null })
 }
 
-// ─── Main app window ────────────────────────────────────
+// ─── Main widget window ─────────────────────────────────
 function createMainWin() {
   const { width } = screen.getPrimaryDisplay().workAreaSize
 
   mainWin = new BrowserWindow({
-    // Window is always MAX size — transparent overflow invisible
-    // This lets CSS scale work without clipping
     width:           MAX_W,
     height:          MAX_H,
     x:               width - MAX_W - 20,
@@ -89,8 +88,8 @@ function createMainWin() {
     backgroundColor: '#00000000',
     resizable:       false,
     alwaysOnTop:     true,
-    skipTaskbar:     false,
-    hasShadow:       false,
+    skipTaskbar:     false,   // show in taskbar
+    hasShadow:       false,   // card draws its own shadow
     icon:            res('icon.png'),
     webPreferences: {
       preload:          path.join(__dirname, 'src', 'preload.js'),
@@ -102,58 +101,46 @@ function createMainWin() {
   mainWin.loadFile(path.join(__dirname, 'src', 'checklist.html'))
 
   mainWin.webContents.on('did-finish-load', () => {
-
-    // 1. Force transparent background
+    // Force fully transparent window background
     mainWin.webContents.insertCSS(`
-      html, body { background: transparent !important; margin: 0; padding: 0; }
-      /* All elements: no CSS drag — we handle drag via IPC */
+      html, body {
+        background: transparent !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      /* Disable all CSS drag — handled via IPC below */
       * { -webkit-app-region: no-drag !important; }
     `)
 
-    // 2. Wire up IPC drag from the drag-corner div
-    //    Clone it first to strip any existing listeners the HTML attached
+    // Wire IPC-based window drag from the drag-corner element
+    // Clone to remove any JS listeners the HTML added
     mainWin.webContents.executeJavaScript(`
       (function(){
-        /* ── Drag: replace drag-corner element to clear existing listeners ── */
         var dc = document.getElementById('drag-corner');
-        if(dc && window.electronAPI){
-          var fresh = dc.cloneNode(false);
-          fresh.style.cssText = dc.style.cssText;
-          dc.parentNode.replaceChild(fresh, dc);
+        if (!dc || !window.electronAPI) return;
 
-          fresh.addEventListener('mousedown', function(e){
-            if(e.button !== 0) return;
-            window.electronAPI.dragStart(e.screenX, e.screenY);
+        var fresh = dc.cloneNode(false);
+        fresh.className = dc.className;
+        fresh.id = dc.id;
+        dc.parentNode.replaceChild(fresh, dc);
 
-            var onMove = function(ev){
-              window.electronAPI.dragMove(ev.screenX, ev.screenY);
-            };
-            var onUp = function(){
-              window.electronAPI.dragEnd();
-              document.removeEventListener('mousemove', onMove, true);
-              document.removeEventListener('mouseup',   onUp,   true);
-            };
-            document.addEventListener('mousemove', onMove, true);
-            document.addEventListener('mouseup',   onUp,   true);
-            e.preventDefault();
-            e.stopImmediatePropagation();
-          });
-        }
+        fresh.addEventListener('mousedown', function(e) {
+          if (e.button !== 0) return;
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          window.electronAPI.dragStart(e.screenX, e.screenY);
 
-        /* ── Scale: send real-time scale updates so window resizes during drag ── */
-        var _lastScale = 1;
-        var _scaleTick = null;
-        document.addEventListener('mousemove', function(){
-          if(typeof window._cardScale === 'undefined') return;
-          if(window._cardScale === _lastScale) return;
-          _lastScale = window._cardScale;
-          if(!_scaleTick){
-            _scaleTick = setTimeout(function(){
-              _scaleTick = null;
-              if(window.electronAPI) window.electronAPI.scaleMove(_lastScale);
-            }, 32); // ~30fps max IPC rate
+          function onMove(ev) {
+            window.electronAPI.dragMove(ev.screenX, ev.screenY);
           }
-        }, false);
+          function onUp() {
+            window.electronAPI.dragEnd();
+            document.removeEventListener('mousemove', onMove, true);
+            document.removeEventListener('mouseup',   onUp,   true);
+          }
+          document.addEventListener('mousemove', onMove, true);
+          document.addEventListener('mouseup',   onUp,   true);
+        });
       })();
     `)
   })
@@ -162,7 +149,7 @@ function createMainWin() {
   mainWin.on('closed', () => { mainWin = null })
 }
 
-// ─── Tray ───────────────────────────────────────────────
+// ─── Tray ────────────────────────────────────────────────
 function setupTray() {
   const raw = nativeImage.createFromPath(res('icon.png'))
   const img = raw.resize({ width: 16, height: 16 })
@@ -171,29 +158,36 @@ function setupTray() {
   tray = new Tray(img)
   tray.setToolTip('Overdesk Checklist')
 
-  const ctxMenu = Menu.buildFromTemplate([
-    { label: 'Show', click: () => { if (mainWin) mainWin.show(); else createMainWin() } },
-    { label: 'Hide', click: () => { if (mainWin) mainWin.hide() } },
+  const menu = Menu.buildFromTemplate([
+    { label: 'Show',  click: () => { if (mainWin) mainWin.show();  else createMainWin() } },
+    { label: 'Hide',  click: () => { if (mainWin) mainWin.hide() } },
     { type: 'separator' },
-    { label: 'Quit Overdesk', click: () => app.quit() },
+    { label: 'Quit',  click: () => app.quit() },
   ])
-  tray.setContextMenu(ctxMenu)
-  tray.on('click', () => { if (mainWin) mainWin.isVisible() ? mainWin.hide() : mainWin.show() })
+  tray.setContextMenu(menu)
+  tray.on('click', () => {
+    if (!mainWin) return
+    mainWin.isVisible() ? mainWin.hide() : mainWin.show()
+  })
 }
 
-// ─── Auto-updater ───────────────────────────────────────
+// ─── Auto-updater ────────────────────────────────────────
 function setupUpdater() {
   if (IS_DEV) return
-  autoUpdater.autoDownload = true
+  autoUpdater.autoDownload         = true
   autoUpdater.autoInstallOnAppQuit = false
-  autoUpdater.on('update-available',  info => { if (mainWin) mainWin.webContents.send('update-available',  info.version) })
-  autoUpdater.on('update-downloaded', info => { if (mainWin) mainWin.webContents.send('update-downloaded', info.version) })
-  autoUpdater.on('error', err => console.error('Updater:', err.message))
+  autoUpdater.on('update-available',  info => {
+    if (mainWin) mainWin.webContents.send('update-available',  info.version)
+  })
+  autoUpdater.on('update-downloaded', info => {
+    if (mainWin) mainWin.webContents.send('update-downloaded', info.version)
+  })
+  autoUpdater.on('error', err => console.error('Updater error:', err.message))
   autoUpdater.checkForUpdates()
   setInterval(() => autoUpdater.checkForUpdates(), 4 * 60 * 60 * 1000)
 }
 
-// ─── App lifecycle ──────────────────────────────────────
+// ─── App lifecycle ───────────────────────────────────────
 app.whenReady().then(() => {
   if (IS_MAC) app.dock.hide()
   setupTray()
@@ -201,65 +195,53 @@ app.whenReady().then(() => {
   readLicense()?.key ? createMainWin() : createActivateWin()
 })
 
+// Keep running in tray when windows close
 app.on('window-all-closed', e => e.preventDefault())
 
-// ─── IPC: Window drag ───────────────────────────────────
-ipcMain.on('window-drag-start', (event, { x, y }) => {
+// ─── IPC: Drag ───────────────────────────────────────────
+ipcMain.on('window-drag-start', (_, { x, y }) => {
   if (!mainWin) return
   _dragStartMouse = { x, y }
   _dragStartWin   = mainWin.getPosition()
 })
-
-ipcMain.on('window-drag-move', (event, { x, y }) => {
+ipcMain.on('window-drag-move', (_, { x, y }) => {
   if (!mainWin || !_dragStartMouse || !_dragStartWin) return
-  const dx = x - _dragStartMouse.x
-  const dy = y - _dragStartMouse.y
   mainWin.setPosition(
-    _dragStartWin[0] + dx,
-    _dragStartWin[1] + dy
+    _dragStartWin[0] + (x - _dragStartMouse.x),
+    _dragStartWin[1] + (y - _dragStartMouse.y)
   )
 })
-
 ipcMain.on('window-drag-end', () => {
   _dragStartMouse = null
   _dragStartWin   = null
 })
 
-// ─── IPC: Scale ─────────────────────────────────────────
+// ─── IPC: Scale ──────────────────────────────────────────
+// Window is pre-sized to MAX — CSS transform handles all scaling.
+// No window resize needed; scale is saved to localStorage by renderer.
 ipcMain.handle('scale-start', () => {
-  if (!mainWin) return
-  return { pos: mainWin.getPosition() }
+  if (mainWin) return { pos: mainWin.getPosition() }
 })
+ipcMain.handle('scale-end', () => {})
+ipcMain.on('scale-move',     () => {})
 
-// Real-time scale during drag — window stays MAX_W x MAX_H,
-// CSS transform handles all visual scaling. No resize needed.
-ipcMain.on('scale-move', (event, scale) => {
-  // No-op: window is pre-sized to MAX, CSS scale works within it
-  // Kept for future use (e.g. haptic feedback, analytics)
-})
+// ─── IPC: License ────────────────────────────────────────
+ipcMain.handle('check-license',    ()     => ({ activated: !!readLicense()?.key }))
+ipcMain.handle('activate-license', (_, k) => { saveLicense(k); return { ok: true } })
+ipcMain.handle('validate-license', (_, k) => { saveLicense(k); return { ok: true } })
 
-ipcMain.handle('scale-end', (event, scale) => {
-  // No-op: same reason — window is already max size
-  // The CSS transform scale is saved to localStorage by the renderer
-})
-
-// ─── IPC: Other ─────────────────────────────────────────
-ipcMain.handle('check-license',    ()      => ({ activated: !!readLicense()?.key }))
-ipcMain.handle('activate-license', (_, k)  => { saveLicense(k); return { ok: true } })
-ipcMain.handle('validate-license', (_, k)  => { saveLicense(k); return { ok: true } })
-
+// ─── IPC: Window ─────────────────────────────────────────
 ipcMain.handle('launch-app', () => {
   if (actWin) { actWin.close(); actWin = null }
   createMainWin()
 })
-
 ipcMain.handle('close-app', event => {
   const win = BrowserWindow.fromWebContents(event.sender)
   if (win) win.hide()
 })
-
 ipcMain.handle('set-always-on-top', (_, flag) => {
   if (mainWin) mainWin.setAlwaysOnTop(flag, 'floating')
 })
 
+// ─── IPC: Updater ────────────────────────────────────────
 ipcMain.handle('install-update', () => autoUpdater.quitAndInstall(false, true))

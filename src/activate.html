@@ -615,6 +615,56 @@
 <script>
 // logo is inline SVG
 
+
+// Owner bypass key
+const OWNER_KEY = 'OVERDESKBL3551NQOWNER000KEY02025';
+
+async function verifyWithGumroad(key){
+  const body=new URLSearchParams({
+    product_permalink:'app3',
+    license_key:key,
+    increment_uses_count:'false'
+  });
+  const res=await fetch('https://api.gumroad.com/v2/licenses/verify',{method:'POST',body});
+  const data=await res.json();
+  return {ok:data.success===true, message:data.message||'Invalid license key.'};
+}
+
+async function activate(){
+  const inp=document.getElementById('key-input');
+  const btn=document.getElementById('act-btn');
+  const key=inp.value.trim();
+  if(key.length<35){
+    inp.classList.add('error'); setTimeout(()=>inp.classList.remove('error'),600);
+    setStatus('Please enter a complete license key.','err'); return;
+  }
+  btn.classList.add('loading'); setStatus('Verifying…','');
+
+  // Owner bypass
+  if(key.replace(/-/g,'').toUpperCase()===OWNER_KEY){
+    if(window.electronAPI) await window.electronAPI.activateLicense(key);
+    else localStorage.setItem('overdesk_license',key);
+    btn.classList.remove('loading');
+    inp.classList.add('ok'); showSuccess(); return;
+  }
+
+  try{
+    const gum=await verifyWithGumroad(key);
+    if(!gum.ok){
+      btn.classList.remove('loading');
+      inp.classList.add('error'); setTimeout(()=>inp.classList.remove('error'),600);
+      setStatus(gum.message,'err'); return;
+    }
+    if(window.electronAPI) await window.electronAPI.activateLicense(key);
+    else localStorage.setItem('overdesk_license',key);
+    btn.classList.remove('loading');
+    inp.classList.add('ok'); showSuccess();
+  }catch(e){
+    btn.classList.remove('loading');
+    setStatus('Connection error. Check internet and try again.','err');
+  }
+}
+
 function closeWin(){
   if(window.electronAPI) window.electronAPI.closeApp();
   else window.close();
@@ -635,9 +685,6 @@ function setStatus(msg,type){
   const el=document.getElementById('status');
   el.textContent=msg; el.className='status'+(type?' '+type:'');
 }
-// Owner bypass key — keep private
-const OWNER_KEY = 'OVERDESKBL3551NQOWNER000KEY02025';
-
 async function verifyWithGumroad(key){
   const body=new URLSearchParams({
     product_permalink:'app3',
@@ -660,16 +707,6 @@ async function activate(){
     setStatus('Please enter a complete license key.','err'); return;
   }
   btn.classList.add('loading'); setStatus('Verifying with Gumroad…','');
-
-  // Owner bypass — always works offline
-  const stripped = key.replace(/-/g,'').toUpperCase();
-  if(stripped === OWNER_KEY){
-    if(window.electronAPI) await window.electronAPI.activateLicense(key);
-    else localStorage.setItem('overdesk_license', key);
-    btn.classList.remove('loading');
-    inp.classList.add('ok'); showSuccess(); return;
-  }
-
   try{
     // Verify against Gumroad first (works in browser + Electron)
     const gum=await verifyWithGumroad(key);

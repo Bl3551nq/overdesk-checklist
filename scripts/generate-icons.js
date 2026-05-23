@@ -1,46 +1,58 @@
 /**
  * generate-icons.js
- * Converts assets/icon.svg → PNGs in build/
- *
- * The SVG is portrait (2160×2682). We render it to a square canvas
- * with slight padding so the logo fills the taskbar/dock icon properly.
- *
- * electron-builder reads build/icon.png (512px) and auto-generates:
- *   - .ico  (Windows) with embedded 16/24/32/48/64/128/256px frames
- *   - .icns (macOS)   with all required sizes
+ * SVG (portrait 2160×2682) → square PNGs with the logo centred and padded.
+ * electron-builder converts build/icon.png (512px) into:
+ *   Windows → .ico  (16 / 32 / 48 / 64 / 128 / 256px frames)
+ *   macOS   → .icns (all required sizes)
  */
 
 const { Resvg } = require('@resvg/resvg-js')
-const fs   = require('fs')
-const path = require('path')
+const fs        = require('fs')
+const path      = require('path')
 
 const ASSETS = path.join(__dirname, '..', 'assets')
 const BUILD  = path.join(__dirname, '..', 'build')
-
 fs.mkdirSync(BUILD, { recursive: true })
 
-const svgBuffer = fs.readFileSync(path.join(ASSETS, 'icon.svg'))
+const svgData   = fs.readFileSync(path.join(ASSETS, 'icon.svg'))
+const svgBase64 = svgData.toString('base64')
+
+// SVG natural dimensions
+const SVG_W = 2160
+const SVG_H = 2682
+const ASPECT = SVG_W / SVG_H   // ≈ 0.806 (portrait)
 
 /**
- * Render SVG to a square PNG at given size.
- * We render at height=size so the portrait SVG fills vertically,
- * giving a naturally centred logo.
+ * Render the SVG centred in a square canvas of `size` px.
+ * padPct = fraction of size used as padding on each side (default 10%).
  */
-function render(size, outFile) {
-  const resvg = new Resvg(svgBuffer, {
-    fitTo: { mode: 'height', value: size },
+function renderSquare(size, outFile, padPct = 0.10) {
+  const logoW  = Math.round(size * (1 - padPct * 2))
+  const logoH  = Math.round(logoW / ASPECT)
+  const offsetX = Math.round((size - logoW) / 2)
+  const offsetY = Math.round((size - logoH) / 2)
+
+  // Embed original SVG as base64 image inside a square wrapper SVG
+  const wrapper = `<svg xmlns="http://www.w3.org/2000/svg"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <image href="data:image/svg+xml;base64,${svgBase64}"
+      x="${offsetX}" y="${offsetY}"
+      width="${logoW}" height="${logoH}"/>
+  </svg>`
+
+  const resvg = new Resvg(Buffer.from(wrapper), {
+    fitTo: { mode: 'width', value: size },
     background: 'transparent',
   })
-  const rendered = resvg.render()
-  const png = rendered.asPng()
+  const png = resvg.render().asPng()
   fs.writeFileSync(path.join(BUILD, outFile), png)
-  const w = rendered.width, hh = rendered.height
-  console.log(`  ✓  build/${outFile}  (${w}×${hh} → target ${size}px)`)
+  console.log(`  ✓  build/${outFile}  (${size}×${size})`)
 }
 
 console.log('\n⬡  Generating Overdesk icons…\n')
-render(512, 'icon.png')      // → .ico and .icns source
-render(256, 'icon-256.png')  // Windows taskbar hi-DPI
-render(32,  'icon-32.png')   // tray source
-render(16,  'icon-16.png')   // tray fallback
+renderSquare(512, 'icon.png')       // → .ico + .icns master
+renderSquare(256, 'icon-256.png')   // Windows hi-DPI taskbar
+renderSquare(32,  'icon-32.png')    // tray icon
+renderSquare(16,  'icon-16.png')    // tray small
 console.log('\n   Done.\n')
