@@ -1,10 +1,12 @@
-
-name: Build & Release
+name: Build & Release Overdesk Everyone
 
 on:
   push:
+    branches:
+      - main
+      - master
     tags:
-      - 'v*.*.*'
+      - 'v*'
   workflow_dispatch:
 
 permissions:
@@ -12,46 +14,33 @@ permissions:
 
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            label: mac
-          - os: windows-latest
-            label: win
-
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-         
+          node-version: 20
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install System Dependencies
+        run: npm install --legacy-peer-deps
 
-      - name: Generate icons from SVG
-        run: node scripts/generate-icons.js
+      - name: Build Web Application (React/Vite)
+        run: npm run build
 
-      - name: Build & publish to GitHub Releases
-        run: npm run build:${{ matrix.label }}
+      - name: Build Windows Executables (Electron Builder)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
-          
-      - name: Upload build artifacts
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish always
+
+      - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: overdesk-${{ matrix.label }}
+          name: Overdesk-Everyone-exe
           path: |
-            dist/*.dmg
-            dist/*.zip
-            dist/*.exe
-            dist/*-portable.exe
+            dist-electron/*.exe
+            dist-electron/*.yml
           if-no-files-found: warn
