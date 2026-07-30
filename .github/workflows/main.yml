@@ -1,4 +1,4 @@
-name: Build & Release Overdesk Everyone
+name: Build & Release Overdesk Checklist
 
 on:
   push:
@@ -39,7 +39,7 @@ jobs:
       - name: Upload Installer Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Overdesk-Everyone-exe
+          name: Overdesk-Checklist-exe
           path: |
             dist-electron/*.exe
             dist-electron/*.yml
