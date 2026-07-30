@@ -2441,7 +2441,7 @@ export default function App() {
               style={{ width: '88px', height: '88px', objectFit: 'contain', marginBottom: '2px' }}
               referrerPolicy="no-referrer"
             />
-            <div className="license-title">Overdesk Checklist</div>
+            <div className="license-title">Overdesk Checklist 2.0</div>
             <div className="license-sub">
               Enter your license key to activate.
               <br />

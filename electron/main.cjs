@@ -223,7 +223,7 @@ function createTray() {
     }
   ]);
 
-  tray.setToolTip('Overdesk Checklist');
+  tray.setToolTip('Overdesk Checklist 2.0');
   tray.setContextMenu(contextMenu);
 
   tray.on('click', () => {
