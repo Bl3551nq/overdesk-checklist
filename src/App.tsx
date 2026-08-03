@@ -4,16 +4,18 @@ import { MinimizedReminderView } from './components/MinimizedReminderView';
 import { Glass } from './components/Glass';
 import GooeyNav, { triggerGooeyParticles } from './components/GooeyNav';
 
-import wallpaperExecutiveArt from './assets/images/wallpaper_executive_art_1784998270755.jpg';
-import wallpaperCyberSkull from './assets/images/wallpaper_cyber_skull_1784998284302.jpg';
-import wallpaperOfficePurple from './assets/images/wallpaper_office_purple_1784998297786.jpg';
-import wallpaperFieryBeast from './assets/images/wallpaper_fiery_beast_1784998309493.jpg';
+import wallpaperFocusGoku from './assets/images/focus_goku_wallpaper_1785758162336.jpg';
+import wallpaperBullBearGold from './assets/images/bull_bear_gold_wallpaper_1785758173635.jpg';
+import wallpaperCandlestickNeon from './assets/images/candlestick_neon_wallpaper_1785758185045.jpg';
+import wallpaperCyberFinance from './assets/images/cyber_finance_wallpaper_1785758195446.jpg';
+import wallpaperDisciplinePushup from './assets/images/discipline_pushup_wallpaper_1785758207049.jpg';
 
 const PRESET_WALLPAPERS = [
-  { id: 'executive_art', name: 'Executive Boardroom', url: wallpaperExecutiveArt },
-  { id: 'cyber_skull', name: 'Cyber Neon Skull', url: wallpaperCyberSkull },
-  { id: 'office_purple', name: 'Executive Office', url: wallpaperOfficePurple },
-  { id: 'fiery_beast', name: 'Fiery Beast', url: wallpaperFieryBeast },
+  { id: 'focus_goku', name: 'Focus (Goku)', url: wallpaperFocusGoku },
+  { id: 'bull_bear_gold', name: 'Golden Bull & Bear', url: wallpaperBullBearGold },
+  { id: 'candlestick_neon', name: 'Neon Candlesticks', url: wallpaperCandlestickNeon },
+  { id: 'cyber_finance', name: 'Cyber Trading Tunnel', url: wallpaperCyberFinance },
+  { id: 'discipline_pushup', name: 'Discipline', url: wallpaperDisciplinePushup },
 ];
 
 // Declaration to access global Electron API from preload script
@@ -641,9 +643,9 @@ export default function App() {
   const [wallpaperUrl, setWallpaperUrl] = useState<string>(() => {
     try {
       const saved = localStorage.getItem('fm_wallpaper_url');
-      return saved !== null ? saved : wallpaperExecutiveArt;
+      return saved !== null ? saved : wallpaperFocusGoku;
     } catch (e) {
-      return wallpaperExecutiveArt;
+      return wallpaperFocusGoku;
     }
   });
 
@@ -735,7 +737,7 @@ export default function App() {
       return updated;
     });
     if (wallpaperUrl === urlToDelete) {
-      handleWallpaperUrlChange(wallpaperExecutiveArt);
+      handleWallpaperUrlChange(wallpaperFocusGoku);
     }
   };
 
@@ -1099,7 +1101,7 @@ export default function App() {
     setAnimateMinimizedText(true);
     setAnimationsEnabled(true);
     setMoveCheckedToBottom(true);
-    setWallpaperUrl(wallpaperExecutiveArt);
+    setWallpaperUrl(wallpaperFocusGoku);
     setCustomWallpapers([]);
     setWallpaperOpacity(60);
     setResetConfirming(false);
