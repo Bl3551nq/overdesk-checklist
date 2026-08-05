@@ -1,4 +1,4 @@
-# Overdesk Checklist 2.0
+# Overdesk Checklist
 
 A sleek, minimalistic transparent desktop overlay checklist designed for Windows. Keep your key daily focus, tasks, and routines floating seamlessly on your desktop with responsive scaling, custom wallpapers, and automated updates.
 
@@ -11,7 +11,7 @@ A sleek, minimalistic transparent desktop overlay checklist designed for Windows
 - **Custom Wallpapers & Light/Dark Themes**: Toggle high-contrast light or executive dark palettes and custom image backgrounds.
 - **Smart Task Management**: Interactive check states, optional auto-moving completed items to bottom, custom audio feedback, and streak counters.
 - **License Protection**: Integrated Gumroad license key validation and secure machine activation logic.
-- **Automated Windows Installer**: Automated GitHub Actions CI/CD workflow producing `Overdesk-Checklist-2.0-exe` installer artifacts (`Overdesk-Checklist-2.0.exe`).
+- **Automated Windows Installer**: Automated GitHub Actions CI/CD workflow producing installer artifacts (`Overdesk-Checklist.exe`).
 
 ---
 

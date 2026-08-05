@@ -2,7 +2,7 @@
   "name": "overdesk-checklist",
   "private": true,
   "version": "2.0.0",
-  "description": "Overdesk Checklist 2.0 - Minimalistic transparent overlay desktop widget checklist.",
+  "description": "Overdesk Checklist - Minimalistic transparent overlay desktop widget checklist.",
   "author": "Overdesk",
   "gumroad": {
     "product_id": "IuGRgU5DfICDDM1w7-eY7Q==",
@@ -21,13 +21,13 @@
   },
   "build": {
     "appId": "com.overdesk.checklist",
-    "productName": "Overdesk Checklist 2.0",
+    "productName": "Overdesk Checklist",
     "icon": "electron/icon.png",
     "win": {
       "target": [
         "nsis"
       ],
-      "artifactName": "Overdesk-Checklist-2.0.${ext}",
+      "artifactName": "Overdesk-Checklist.${ext}",
       "icon": "electron/icon.png",
       "requestedExecutionLevel": "asInvoker"
     },
